@@ -1,11 +1,25 @@
 [workspace]
+resolver = "3"
 members = [
     "crates/executors",
     "crates/utils",
     "crates/api-types",
     "crates/git",
 ]
-resolver = "3"
+
+[package]
+name = "code-marshal"
+version = "0.1.2"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tokio-stream = "0.1"
+executors = { path = "crates/executors" }
+workspace-utils = { path = "crates/utils", package = "utils" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [workspace.dependencies]
 tokio = { version = "1.0", features = ["full"] }

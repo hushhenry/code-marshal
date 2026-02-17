@@ -1,16 +1,17 @@
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 use executors::executors::{CodingAgent, StandardCodingAgentExecutor, BaseCodingAgent};
 use executors::approvals::NoopExecutorApprovalService;
-use executors::MsgStore;
+use executors::env::{ExecutionEnv, RepoContext};
+use workspace_utils::msg_store::MsgStore;
 use anyhow::{Result, Context};
 use std::collections::HashMap;
 use std::str::FromStr;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
     
     if args.len() < 2 {
         print_usage();
@@ -51,31 +52,36 @@ async fn main() -> Result<()> {
     println!("[SYSTEM] Initializing Code-Marshal with Agent: {}...", agent_type);
 
     // 1. Setup Executor
-    let mut agent = match agent_type {
-        BaseCodingAgent::ClaudeCode => CodingAgent::from(executors::executors::claude::ClaudeCode::default()),
-        BaseCodingAgent::CursorAgent => CodingAgent::from(executors::executors::cursor::CursorAgent::default()),
-        BaseCodingAgent::Codex => CodingAgent::from(executors::executors::codex::Codex::default()),
-        BaseCodingAgent::Opencode => CodingAgent::from(executors::executors::opencode::Opencode::default()),
-        BaseCodingAgent::Gemini => CodingAgent::from(executors::executors::gemini::Gemini::default()),
-        BaseCodingAgent::QwenCode => CodingAgent::from(executors::executors::qwen::QwenCode::default()),
-        BaseCodingAgent::Amp => CodingAgent::from(executors::executors::amp::Amp::default()),
-        BaseCodingAgent::Copilot => CodingAgent::from(executors::executors::copilot::Copilot::default()),
-        BaseCodingAgent::Droid => CodingAgent::from(executors::executors::droid::Droid::default()),
-        _ => anyhow::bail!("Agent type {} is not fully supported in this CLI yet", agent_type),
+    let agent_json = "{}";
+    let mut agent: CodingAgent = match agent_type {
+        BaseCodingAgent::ClaudeCode => serde_json::from_str::<executors::executors::claude::ClaudeCode>(agent_json)?.into(),
+        BaseCodingAgent::CursorAgent => serde_json::from_str::<executors::executors::cursor::CursorAgent>(agent_json)?.into(),
+        BaseCodingAgent::Codex => serde_json::from_str::<executors::executors::codex::Codex>(agent_json)?.into(),
+        BaseCodingAgent::Opencode => serde_json::from_str::<executors::executors::opencode::Opencode>(agent_json)?.into(),
+        BaseCodingAgent::Gemini => serde_json::from_str::<executors::executors::gemini::Gemini>(agent_json)?.into(),
+        BaseCodingAgent::QwenCode => serde_json::from_str::<executors::executors::qwen::QwenCode>(agent_json)?.into(),
+        BaseCodingAgent::Amp => serde_json::from_str::<executors::executors::amp::Amp>(agent_json)?.into(),
+        BaseCodingAgent::Copilot => serde_json::from_str::<executors::executors::copilot::Copilot>(agent_json)?.into(),
+        BaseCodingAgent::Droid => serde_json::from_str::<executors::executors::droid::Droid>(agent_json)?.into(),
     };
     
     // 2. Setup Auto-Approval
     let approval_service = Arc::new(NoopExecutorApprovalService::default());
     agent.use_approvals(approval_service);
     
-    // 3. Environment variables
-    let mut env = HashMap::new();
+    // 3. Environment setup
+    let current_dir = std::env::current_dir()?;
+    let repo_context = RepoContext::new(current_dir.clone(), vec![]);
+    let mut env = ExecutionEnv::new(repo_context, false, String::new());
+    
+    // Load existing env vars
+    let mut vars = HashMap::new();
     for (key, value) in std::env::vars() {
-        env.insert(key, value);
+        vars.insert(key, value);
     }
+    env.merge(&vars);
 
     // 4. Spawn Agent
-    let current_dir = std::env::current_dir()?;
     println!("[SYSTEM] Spawning agent in {:?}", current_dir);
     
     let _spawned = agent.spawn(
@@ -98,16 +104,18 @@ async fn main() -> Result<()> {
 
     // 7. Stream Normalized Logs to Stdout
     println!("[SYSTEM] Task started. Streaming normalized events...");
-    let mut stream = msg_store.stream();
-    while let Some(msg) = stream.next().await {
-        // Output normalized log for OpenClaw to consume
-        println!("[AGENT_EVENT] {:?}", msg);
-        
-        // Basic finish detection: If the agent provides a final result or error
-        let msg_str = format!("{:?}", msg);
-        if msg_str.contains("Finished") || msg_str.contains("Error") {
-            println!("[SYSTEM] Task termination signal detected.");
-            break;
+    let mut stream = msg_store.history_plus_stream();
+    while let Some(msg_result) = stream.next().await {
+        if let Ok(msg) = msg_result {
+            // Output normalized log for OpenClaw to consume
+            println!("[AGENT_EVENT] {:?}", msg);
+            
+            // Basic finish detection: If the agent provides a final result or error
+            let msg_str = format!("{:?}", msg);
+            if msg_str.contains("Finished") || msg_str.contains("Error") {
+                println!("[SYSTEM] Task termination signal detected.");
+                break;
+            }
         }
     }
 

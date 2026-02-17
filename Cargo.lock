@@ -804,6 +804,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9b18233253483ce2f65329a24072ec414db782531bdbb7d0bbc4bd2ce6b7e21"
 
 [[package]]
+name = "code-marshal"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "executors",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "utils",
+]
+
+[[package]]
 name = "codex-api"
 version = "0.98.0"
 source = "git+https://github.com/openai/codex.git?tag=rust-v0.98.0#82464689ce0ba8a3b2065e73a8aa0cfdf2ad0625"
