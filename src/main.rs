@@ -146,7 +146,6 @@ fn create_agent(agent_type: BaseCodingAgent) -> Result<CodingAgent> {
         BaseCodingAgent::Amp => Ok(serde_json::from_str::<executors::executors::amp::Amp>(agent_json)?.into()),
         BaseCodingAgent::Copilot => Ok(serde_json::from_str::<executors::executors::copilot::Copilot>(agent_json)?.into()),
         BaseCodingAgent::Droid => Ok(serde_json::from_str::<executors::executors::droid::Droid>(agent_json)?.into()),
-        _ => anyhow::bail!("Agent type {} is not fully supported in this CLI yet", agent_type),
     }
 }
 
@@ -158,6 +157,9 @@ fn get_installed_agent_types() -> Result<Vec<BaseCodingAgent>> {
         BaseCodingAgent::Opencode,
         BaseCodingAgent::Gemini,
         BaseCodingAgent::QwenCode,
+        BaseCodingAgent::Amp,
+        BaseCodingAgent::Copilot,
+        BaseCodingAgent::Droid,
     ];
     
     let mut installed = Vec::new();
@@ -182,6 +184,9 @@ async fn check_installed_agents() -> Result<()> {
         BaseCodingAgent::Opencode,
         BaseCodingAgent::Gemini,
         BaseCodingAgent::QwenCode,
+        BaseCodingAgent::Amp,
+        BaseCodingAgent::Copilot,
+        BaseCodingAgent::Droid,
     ];
 
     for at in all_types {
