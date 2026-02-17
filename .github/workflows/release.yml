@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build for ${{ matrix.target }}
@@ -57,8 +60,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            code-marshal-linux-x86_64/code-marshal
-            code-marshal-macos-x86_64/code-marshal
-            code-marshal-macos-aarch64/code-marshal
+            code-marshal-linux-x86_64/*
+            code-marshal-macos-x86_64/*
+            code-marshal-macos-aarch64/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
