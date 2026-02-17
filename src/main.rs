@@ -62,9 +62,14 @@ async fn main() -> Result<()> {
         // Output normalized log for OpenClaw to consume
         println!("[AGENT_EVENT] {:?}", msg);
         
-        // Simple finish detection based on Vibe's message types
-        // In a real implementation, we'd check if msg is a 'Result' or 'Finish' type
+        // Basic finish detection: If the agent provides a final result or error
+        let msg_str = format!("{:?}", msg);
+        if msg_str.contains("Finished") || msg_str.contains("Error") {
+            println!("[SYSTEM] Task termination signal detected.");
+            break;
+        }
     }
 
+    println!("[SYSTEM] Code-Marshal session concluded.");
     Ok(())
 }
