@@ -199,6 +199,9 @@ fn list_agents() {
     println!("  - OPENCODE     (OpenCode)");
     println!("  - GEMINI       (Google)");
     println!("  - QWEN_CODE    (Alibaba)");
+    println!("  - AMP          (Bloop)");
+    println!("  - COPILOT      (GitHub)");
+    println!("  - DROID        (Droid)");
 }
 
 fn print_usage() {
