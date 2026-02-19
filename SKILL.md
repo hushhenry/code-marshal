@@ -66,22 +66,22 @@ code-marshal -a GEMINI --raw "..."
 
 ---
 
-## Recommended OpenClaw Pattern: background + PTY
+## Recommended OpenClaw Pattern: background
 
-Run in the background with PTY enabled to monitor the event stream.
+Run in the background to monitor the event stream. PTY is usually unnecessary because code-marshal does not require stdin.
 
 ```bash
 # Start a coding task (agent auto-pick if --agent is omitted)
-bash pty:true workdir:~/my-project background:true command:"code-marshal 'Refactor auth to use JWT'"
+bash workdir:~/my-project background:true command:"code-marshal 'Refactor auth to use JWT'"
 
 # Specify agent
-bash pty:true workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this function'"
+bash workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this function'"
 
 # Pretty output (human readable)
-bash pty:true workdir:~/my-project background:true command:"code-marshal --pretty --agent GEMINI 'write a simple html'"
+bash workdir:~/my-project background:true command:"code-marshal --pretty --agent GEMINI 'write a simple html'"
 
 # Follow-up (multi-turn)
-bash pty:true workdir:~/my-project background:true command:"code-marshal --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
+bash workdir:~/my-project background:true command:"code-marshal --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
 
 # Monitor progress
 process action:log sessionId:XXX
