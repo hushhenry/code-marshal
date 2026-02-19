@@ -1,26 +1,29 @@
-use std::sync::Arc;
+use std::{collections::HashMap, str::FromStr, sync::Arc};
+
+use anyhow::{Context, Result};
+use executors::{
+    approvals::NoopExecutorApprovalService,
+    env::{ExecutionEnv, RepoContext},
+    executors::{BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor},
+};
 use tokio_stream::StreamExt;
-use executors::executors::{CodingAgent, StandardCodingAgentExecutor, BaseCodingAgent};
-use executors::approvals::NoopExecutorApprovalService;
-use executors::env::{ExecutionEnv, RepoContext};
-use workspace_utils::msg_store::MsgStore;
-use anyhow::{Result, Context};
-use std::collections::HashMap;
-use std::str::FromStr;
+use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    
+
     if args.len() < 2 {
         print_usage();
         return Ok(());
     }
 
     let mut agent_type_str: Option<String> = None;
+    let mut follow_up_session_id: Option<String> = None;
+    let mut reset_to_message_id: Option<String> = None;
     let mut prompt = String::new();
 
-    // Simple arg parsing
+    // Simple arg parsing (intentionally lightweight; clap can be added later)
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -34,16 +37,33 @@ async fn main() -> Result<()> {
             }
             "--agent" | "-a" => {
                 if i + 1 < args.len() {
-                    agent_type_str = Some(args[i+1].clone());
+                    agent_type_str = Some(args[i + 1].clone());
                     i += 2;
                 } else {
                     anyhow::bail!("Missing value for --agent");
                 }
             }
-            arg if arg.starts_with("-") => {
+            "--follow-up" | "-f" => {
+                if i + 1 < args.len() {
+                    follow_up_session_id = Some(args[i + 1].clone());
+                    i += 2;
+                } else {
+                    anyhow::bail!("Missing value for --follow-up <SESSION_ID>");
+                }
+            }
+            "--reset-to" => {
+                if i + 1 < args.len() {
+                    reset_to_message_id = Some(args[i + 1].clone());
+                    i += 2;
+                } else {
+                    anyhow::bail!("Missing value for --reset-to <MESSAGE_ID>");
+                }
+            }
+            arg if arg.starts_with('-') => {
                 anyhow::bail!("Unknown argument: {}", arg);
             }
             arg => {
+                // Treat the first positional argument as the prompt (remaining positionals are ignored)
                 prompt = arg.to_string();
                 i += 1;
             }
@@ -57,34 +77,39 @@ async fn main() -> Result<()> {
 
     // Determine agent type
     let agent_type = if let Some(s) = agent_type_str {
-        BaseCodingAgent::from_str(&s.to_uppercase())
-            .map_err(|_| anyhow::anyhow!("Unknown agent type: {}. Valid values: CLAUDE_CODE, CURSOR_AGENT, CODEX, OPENCODE, GEMINI, QWEN_CODE, etc.", s))?
+        BaseCodingAgent::from_str(&s.to_uppercase()).map_err(|_| {
+            anyhow::anyhow!(
+                "Unknown agent type: {}. Valid values: CLAUDE_CODE, CURSOR_AGENT, CODEX, OPENCODE, GEMINI, QWEN_CODE, etc.",
+                s
+            )
+        })?
     } else {
-        // Default logic: find the first installed agent
         println!("[SYSTEM] No agent specified. Finding first available agent...");
         let available = get_installed_agent_types()?;
         if let Some(first) = available.first() {
             println!("[SYSTEM] Using first available agent: {}", first);
             first.clone()
         } else {
-            anyhow::bail!("No coding agents found on system. Please install one (e.g., claude-code, cursor, etc.)");
+            anyhow::bail!(
+                "No coding agents found on system. Please install one (e.g., claude-code, cursor, etc.)"
+            );
         }
     };
 
     println!("[SYSTEM] Initializing Code-Marshal with Agent: {}...", agent_type);
 
-    // 1. Setup Executor
+    // 1) Setup executor
     let mut agent = create_agent(agent_type)?;
-    
-    // 2. Setup Auto-Approval
+
+    // 2) Auto-approval (fully automated)
     let approval_service = Arc::new(NoopExecutorApprovalService::default());
     agent.use_approvals(approval_service);
-    
-    // 3. Environment setup
+
+    // 3) Environment setup
     let current_dir = std::env::current_dir()?;
     let repo_context = RepoContext::new(current_dir.clone(), vec![]);
     let mut env = ExecutionEnv::new(repo_context, false, String::new());
-    
+
     // Load existing env vars
     let mut vars = HashMap::new();
     for (key, value) in std::env::vars() {
@@ -92,40 +117,85 @@ async fn main() -> Result<()> {
     }
     env.merge(&vars);
 
-    // 4. Spawn Agent
+    // 4) Spawn agent (initial or follow-up)
     println!("[SYSTEM] Spawning agent in {:?}", current_dir);
-    
-    let _spawned = agent.spawn(
-        &current_dir,
-        &prompt,
-        &env
-    ).await.context("Failed to spawn agent")?;
 
-    // 5. Initialize Message Store for Normalized Logs
+    let mut spawned = if let Some(session_id) = follow_up_session_id.as_deref() {
+        println!("[SYSTEM] Follow-up session: {}", session_id);
+        agent.spawn_follow_up(
+            &current_dir,
+            &prompt,
+            session_id,
+            reset_to_message_id.as_deref(),
+            &env,
+        )
+        .await
+        .context("Failed to spawn follow-up")?
+    } else {
+        agent.spawn(&current_dir, &prompt, &env)
+            .await
+            .context("Failed to spawn agent")?
+    };
+
+    // 5) Initialize message store for normalized logs
     let msg_store = Arc::new(MsgStore::new());
-    
-    // 6. Start Log Normalization (Background)
-    let agent_clone = agent.clone();
-    let msg_store_clone = msg_store.clone();
-    let dir_clone = current_dir.clone();
-    
-    tokio::spawn(async move {
-        agent_clone.normalize_logs(msg_store_clone, &dir_clone);
-    });
 
-    // 7. Stream Normalized Logs to Stdout
+    // 6) Start log normalization (background)
+    {
+        let agent_clone = agent.clone();
+        let msg_store_clone = msg_store.clone();
+        let dir_clone = current_dir.clone();
+        tokio::spawn(async move {
+            agent_clone.normalize_logs(msg_store_clone, &dir_clone);
+        });
+    }
+
+    // 7) Stream normalized logs to stdout, and *reliably* terminate when the child exits.
     println!("[SYSTEM] Task started. Streaming normalized events...");
+
     let mut stream = msg_store.history_plus_stream();
-    while let Some(msg_res) = stream.next().await {
-        if let Ok(msg) = msg_res {
-            // Output normalized log for OpenClaw to consume
-            println!("[AGENT_EVENT] {:?}", msg);
-            
-            // Basic finish detection: If the agent provides a final result or error
-            let msg_str = format!("{:?}", msg);
-            if msg_str.contains("Finished") || msg_str.contains("Error") {
-                println!("[SYSTEM] Task termination signal detected.");
+    let mut exit_signal = spawned.exit_signal.take();
+
+    loop {
+        tokio::select! {
+            // Prefer real process completion over heuristics.
+            res = async {
+                match &mut exit_signal {
+                    Some(rx) => rx.await.ok(),
+                    None => None,
+                }
+            } => {
+                // Ensure downstream consumers see a consistent termination marker.
+                msg_store.push_finished();
+                println!("[SYSTEM] Child process exited: {:?}", res);
                 break;
+            }
+            msg_res = stream.next() => {
+                match msg_res {
+                    Some(Ok(msg)) => {
+                        // Output normalized log for OpenClaw / orchestrators to consume
+                        println!("[AGENT_EVENT] {:?}", msg);
+
+                        // Nice-to-have: surface session id clearly for follow-ups
+                        if let LogMsg::SessionId(id) = &msg {
+                            println!("[SYSTEM] SessionId: {}", id);
+                            println!("[SYSTEM] Follow-up usage: code-marshal -a {} --follow-up {} \"your next prompt\"", agent_type, id);
+                        }
+
+                        if matches!(msg, LogMsg::Finished) {
+                            println!("[SYSTEM] Finished event received.");
+                            break;
+                        }
+                    }
+                    Some(Err(_)) => {
+                        // keep going on stream errors
+                    }
+                    None => {
+                        // Stream ended (should be rare); push Finished to close out.
+                        msg_store.push_finished();
+                        break;
+                    }
+                }
             }
         }
     }
@@ -212,9 +282,15 @@ fn list_agents() {
 fn print_usage() {
     println!("Usage: code-marshal [OPTIONS] <PROMPT>");
     println!("");
+    println!("Modes:");
+    println!("  oneshot (default): run a single prompt in a new agent session");
+    println!("  follow-up        : resume/fork an existing session via --follow-up <SESSION_ID>");
+    println!("");
     println!("Options:");
-    println!("  -a, --agent <AGENT>     Specify the agent to use");
-    println!("                          (Defaults to the first installed agent found)");
-    println!("  -l, --list-agents       List all supported agent types");
-    println!("  -c, --check-installed   Check which agents are installed on the system");
+    println!("  -a, --agent <AGENT>         Specify the agent to use");
+    println!("                              (Defaults to the first installed agent found)");
+    println!("  -f, --follow-up <SESSION>   Run as follow-up using an existing session id");
+    println!("      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)");
+    println!("  -l, --list-agents           List all supported agent types");
+    println!("  -c, --check-installed       Check which agents are installed on the system");
 }
