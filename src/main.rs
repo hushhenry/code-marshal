@@ -27,7 +27,8 @@ async fn main() -> Result<()> {
     let mut agent_type_str: Option<String> = None;
     let mut follow_up_session_id: Option<String> = None;
     let mut include_raw_logs = false;
-    let mut pretty = false;
+    // Default to pretty output to reduce token volume for human/AI consumers.
+    let mut pretty = true;
     let mut prompt = String::new();
 
     // Simple arg parsing (intentionally lightweight; clap can be added later)
@@ -68,6 +69,10 @@ async fn main() -> Result<()> {
             }
             "--pretty" => {
                 pretty = true;
+                i += 1;
+            }
+            "--json" => {
+                pretty = false;
                 i += 1;
             }
             arg if arg.starts_with('-') => {
@@ -363,7 +368,8 @@ Options:
   -a, --agent <AGENT>         Specify the agent to use
                               (Defaults to the first installed agent found)
   -f, --follow-up <SESSION>   Run as follow-up using an existing session id
-      --pretty                Pretty-print normalized events (human readable)
+      --pretty                Pretty-print normalized events (human readable) [default]
+      --json                  Emit machine-readable LogMsg JSON events instead of pretty output
       --raw                   Also emit raw child stdout/stderr events (default: normalized-only)
   -l, --list-agents           List all supported agent types
   -c, --check-installed       Check which agents are installed on the system

@@ -42,10 +42,10 @@ cargo install --path .
 code-marshal --help
 
 # oneshot
-code-marshal -a GEMINI "write a simple html"
+code-marshal --pretty -a GEMINI "write a simple html"
 
 # follow-up
-code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
+code-marshal --pretty -a GEMINI --follow-up <SESSION_ID> "add a button"
 ```
 
 ## How it works
