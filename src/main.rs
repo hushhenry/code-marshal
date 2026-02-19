@@ -362,22 +362,26 @@ fn list_agents() {
 }
 
 fn print_usage() {
-    println!("Usage: code-marshal [OPTIONS] <PROMPT>");
-    println!("");
-    println!("Modes:");
-    println!("  oneshot (default): run a single prompt in a new agent session");
-    println!("  follow-up        : resume/fork an existing session via --follow-up <SESSION_ID>");
-    println!("");
-    println!("Options:");
-    println!("  -h, --help                  Show this help");
-    println!("  -a, --agent <AGENT>         Specify the agent to use");
-    println!("                              (Defaults to the first installed agent found)");
-    println!("  -f, --follow-up <SESSION>   Run as follow-up using an existing session id");
-    println!("      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)");
-    println!("      --pretty                Pretty-print normalized events (human readable)");
-    println!("      --raw                   Also emit raw child stdout/stderr events (default: normalized-only)");
-    println!("  -l, --list-agents           List all supported agent types");
-    println!("  -c, --check-installed       Check which agents are installed on the system");
+    // Use a single raw string to avoid any weird escaping / parsing issues across toolchains.
+    print!(
+        r#"Usage: code-marshal [OPTIONS] <PROMPT>
+
+Modes:
+  oneshot (default): run a single prompt in a new agent session
+  follow-up        : resume/fork an existing session via --follow-up <SESSION_ID>
+
+Options:
+  -h, --help                  Show this help
+  -a, --agent <AGENT>         Specify the agent to use
+                              (Defaults to the first installed agent found)
+  -f, --follow-up <SESSION>   Run as follow-up using an existing session id
+      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)
+      --pretty                Pretty-print normalized events (human readable)
+      --raw                   Also emit raw child stdout/stderr events (default: normalized-only)
+  -l, --list-agents           List all supported agent types
+  -c, --check-installed       Check which agents are installed on the system
+"#
+    );
 }
 
 #[derive(serde::Deserialize)]
