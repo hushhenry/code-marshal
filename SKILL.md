@@ -94,7 +94,6 @@ process action:log sessionId:XXX
 - `-h, --help`: show help.
 - `-a, --agent <AGENT>`: specify an agent engine (e.g. `CLAUDE_CODE`, `CURSOR_AGENT`, `CODEX`, `OPENCODE`, `GEMINI`, `QWEN_CODE`).
 - `-f, --follow-up <SESSION_ID>`: run a follow-up prompt in an existing session.
-- (removed) `--reset-to`: reset to message id is not reliably available across executors.
 - `--pretty`: pretty-print normalized events.
 - `--raw`: also emit raw child stdout/stderr events.
 - `-l, --list-agents`: list supported agent engines.
