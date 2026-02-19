@@ -76,6 +76,7 @@ impl ProtocolPeer {
                             if line.is_empty() {
                                 continue;
                             }
+                            tracing::debug!("Claude protocol line: {}", line);
                             client.log_message(line).await?;
 
                             // Parse and handle control messages

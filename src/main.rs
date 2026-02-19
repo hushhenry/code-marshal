@@ -11,6 +11,15 @@ use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into())
+                .add_directive("executors=debug".parse().unwrap()),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
@@ -216,20 +225,35 @@ async fn main() -> Result<()> {
 
     let mut stream = msg_store.history_plus_stream();
     let mut exit_signal = spawned.exit_signal.take();
+    let mut child_exited = false;
 
     loop {
         tokio::select! {
             // Prefer real process completion over heuristics.
             res = async {
-                match &mut exit_signal {
-                    Some(rx) => rx.await.ok(),
-                    None => None,
+                if let Some(rx) = &mut exit_signal {
+                    rx.await.ok()
+                } else {
+                    // Fallback for agents that don't provide a discrete exit signal:
+                    // Wait for the child process to exit directly.
+                    match spawned.child.wait().await {
+                        Ok(status) => {
+                            if status.success() {
+                                Some(executors::executors::ExecutorExitResult::Success)
+                            } else {
+                                Some(executors::executors::ExecutorExitResult::Failure)
+                            }
+                        }
+                        Err(_) => Some(executors::executors::ExecutorExitResult::Failure),
+                    }
                 }
-            } => {
-                // Ensure downstream consumers see a consistent termination marker.
+            }, if !child_exited => {
+                child_exited = true;
+                // We wait a tiny bit to allow background log processors to catch up
+                // before we push the finished marker.
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 msg_store.push_finished();
                 println!("[SYSTEM] Child process exited: {:?}", res);
-                break;
             }
             msg_res = stream.next() => {
                 match msg_res {
@@ -254,7 +278,9 @@ async fn main() -> Result<()> {
                         }
 
                         if matches!(msg, LogMsg::Finished) {
-                            println!("[SYSTEM] Finished event received.");
+                            if !child_exited {
+                                println!("[SYSTEM] Finished event received before child exit.");
+                            }
                             break;
                         }
                     }
@@ -263,7 +289,9 @@ async fn main() -> Result<()> {
                     }
                     None => {
                         // Stream ended (should be rare); push Finished to close out.
-                        msg_store.push_finished();
+                        if !child_exited {
+                            msg_store.push_finished();
+                        }
                         break;
                     }
                 }

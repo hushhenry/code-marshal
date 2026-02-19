@@ -256,8 +256,8 @@ impl AcpAgentHarness {
                     Ok(line) => {
                         // Use \r\n on Windows for compatibility with buggy ACP implementations
                         const LINE_ENDING: &str = if cfg!(windows) { "\r\n" } else { "\n" };
-                        let line = line + LINE_ENDING;
-                        if let Err(err) = child_stdin.write_all(line.as_bytes()).await {
+                        let line_with_ending = line + LINE_ENDING;
+                        if let Err(err) = child_stdin.write_all(line_with_ending.as_bytes()).await {
                             tracing::debug!("Failed to write to child stdin {err}");
                             break;
                         }
@@ -273,8 +273,8 @@ impl AcpAgentHarness {
 
         let mut exit_signal_tx = exit_signal;
 
-        // Run ACP client in a LocalSet
-        tokio::task::spawn_blocking(move || {
+        // Run ACP client in a separate thread because ACP conns are !Send
+        std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()

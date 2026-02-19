@@ -246,7 +246,9 @@ impl ClaudeAgentClient {
     }
 
     pub async fn log_message(&self, line: &str) -> Result<(), ExecutorError> {
+        tracing::debug!("Claude log: {}", line);
         if line.contains("\"type\":\"system\"") && line.contains("\"subtype\":\"init\"") {
+            tracing::info!("Detected Claude init message!");
             if let Some(tx) = self.init_tx.lock().await.take() {
                 let _ = tx.send(());
             }

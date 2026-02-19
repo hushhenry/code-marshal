@@ -20,6 +20,8 @@ workspace-utils = { path = "crates/utils", package = "utils" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Used by the CLI for streaming child stdout/stderr into MsgStore
 futures = { workspace = true }
