@@ -24,7 +24,7 @@ Key properties:
 ### Oneshot (default)
 
 ```bash
-code-marshal --pretty -a GEMINI "write a simple html"
+code-marshal -a GEMINI "write a simple html"
 ```
 
 The output includes a `SessionId` event. Save it for follow-ups.
@@ -32,14 +32,14 @@ The output includes a `SessionId` event. Save it for follow-ups.
 ### Follow-up (multi-turn)
 
 ```bash
-code-marshal --pretty -a GEMINI --follow-up <SESSION_ID> "add a button"
+code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
 ```
 
 ---
 
 ## Output Format (important)
 
-Default output is **pretty** (human-readable) to reduce token volume. Use `--json` if you need machine-readable `LogMsg` JSON.
+Default output is **pretty** (human-readable) to reduce token volume.
 
 By default, code-marshal prints **normalized events only**.
 
@@ -55,7 +55,7 @@ By default, code-marshal prints **normalized events only**.
 If you want a more readable stream, add `--pretty`:
 
 ```bash
-code-marshal --pretty -a GEMINI "write a simple html"
+code-marshal -a GEMINI "write a simple html"
 ```
 
 ### Include raw child stdout/stderr (debugging)
@@ -63,7 +63,7 @@ code-marshal --pretty -a GEMINI "write a simple html"
 Raw logs are off by default; enable with `--raw`:
 
 ```bash
-code-marshal --pretty -a GEMINI --raw "..."
+code-marshal -a GEMINI --raw "..."
 ```
 
 ---
@@ -74,16 +74,16 @@ Run in the background to monitor the event stream. PTY is usually unnecessary be
 
 ```bash
 # Start a coding task (agent auto-pick if --agent is omitted)
-bash workdir:~/my-project background:true command:"code-marshal --pretty 'Refactor auth to use JWT'"
+bash workdir:~/my-project background:true command:"code-marshal 'Refactor auth to use JWT'"
 
 # Specify agent
-bash workdir:~/my-project background:true command:"code-marshal --pretty --agent CURSOR_AGENT 'Explain this function'"
+bash workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this function'"
 
 # Pretty output (human readable)
-bash workdir:~/my-project background:true command:"code-marshal --pretty --agent GEMINI 'write a simple html'"
+bash workdir:~/my-project background:true command:"code-marshal --agent GEMINI 'write a simple html'"
 
 # Follow-up (multi-turn)
-bash workdir:~/my-project background:true command:"code-marshal --pretty --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
+bash workdir:~/my-project background:true command:"code-marshal --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
 
 # Monitor progress
 process action:log sessionId:XXX
@@ -96,7 +96,6 @@ process action:log sessionId:XXX
 - `-h, --help`: show help.
 - `-a, --agent <AGENT>`: specify an agent engine (e.g. `CLAUDE_CODE`, `CURSOR_AGENT`, `CODEX`, `OPENCODE`, `GEMINI`, `QWEN_CODE`).
 - `-f, --follow-up <SESSION_ID>`: run a follow-up prompt in an existing session.
-- `--pretty`: pretty-print normalized events.
 - `--raw`: also emit raw child stdout/stderr events.
 - `-l, --list-agents`: list supported agent engines.
 - `-c, --check-installed`: check which engines are installed.

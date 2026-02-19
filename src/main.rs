@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     let mut follow_up_session_id: Option<String> = None;
     let mut include_raw_logs = false;
     // Default to pretty output to reduce token volume for human/AI consumers.
-    let mut pretty = true;
+    let mut json_output = false;
     let mut prompt = String::new();
 
     // Simple arg parsing (intentionally lightweight; clap can be added later)
@@ -67,12 +67,8 @@ async fn main() -> Result<()> {
                 include_raw_logs = true;
                 i += 1;
             }
-            "--pretty" => {
-                pretty = true;
-                i += 1;
-            }
             "--json" => {
-                pretty = false;
+                json_output = true;
                 i += 1;
             }
             arg if arg.starts_with('-') => {
@@ -242,12 +238,12 @@ async fn main() -> Result<()> {
                         // Raw stdout/stderr can be enabled via --raw.
                         let is_raw = matches!(msg, LogMsg::Stdout(_) | LogMsg::Stderr(_));
                         if include_raw_logs || !is_raw {
-                            if pretty {
-                                pretty_print_logmsg(&msg);
-                            } else {
+                            if json_output {
                                 let json = serde_json::to_string(&msg)
                                     .unwrap_or_else(|_| format!("{msg:?}"));
                                 println!("[AGENT_EVENT] {json}");
+                            } else {
+                                pretty_print_logmsg(&msg);
                             }
                         }
 
@@ -368,7 +364,6 @@ Options:
   -a, --agent <AGENT>         Specify the agent to use
                               (Defaults to the first installed agent found)
   -f, --follow-up <SESSION>   Run as follow-up using an existing session id
-      --pretty                Pretty-print normalized events (human readable) [default]
       --json                  Emit machine-readable LogMsg JSON events instead of pretty output
       --raw                   Also emit raw child stdout/stderr events (default: normalized-only)
   -l, --list-agents           List all supported agent types
