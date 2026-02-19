@@ -9,45 +9,101 @@ metadata:
 
 # Code-Marshal Skill
 
-Use **code-marshal** to drive heavy-duty coding tasks with normalized log output. It automatically detects and uses the first available coding agent on your system.
+Use **code-marshal** to drive multiple coding agents (Claude Code / Cursor / Codex / OpenCode / Gemini / Qwen, etc.) through **one unified CLI**.
 
-## Pattern: background + pty
+Key properties:
 
-Always run in the background with PTY enabled to monitor the normalized `[AGENT_EVENT]` stream.
+- **Oneshot + Follow-up**: run a new task, then continue multi-turn work by resuming/forking a previous session.
+- **Normalized events**: emits a stream of normalized events (session id, assistant messages, tool calls/results) as machine-readable JSON.
+- **Automation-first**: can run with auto-approvals (no human gating).
+
+---
+
+## Quick Start
+
+### Oneshot (default)
 
 ```bash
-# Start a coding task (will use the first available agent automatically)
-bash pty:true workdir:~/my-project background:true command:"code-marshal 'Refactor the authentication logic to use JWT'"
+code-marshal -a GEMINI "write a simple html"
+```
 
-# Start a task with a specific agent override
-bash pty:true workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this complex function'"
+The output includes a `SessionId` event. Save it for follow-ups.
 
-# Monitor progress by reading logs
+### Follow-up (multi-turn)
+
+```bash
+code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
+```
+
+---
+
+## Output Format (important)
+
+By default, code-marshal prints **normalized events only**.
+
+- Each event is printed as a single line prefixed with:
+  - `[AGENT_EVENT] <json>`
+- Event JSON is `LogMsg` serialized (examples):
+  - `{ "SessionId": "..." }`
+  - `{ "JsonPatch": [...] }` (normalized assistant/tool entries)
+  - `{ "Finished": ... }`
+
+### Pretty printing (human readable)
+
+If you want a more readable stream, add `--pretty`:
+
+```bash
+code-marshal --pretty -a GEMINI "write a simple html"
+```
+
+### Include raw child stdout/stderr (debugging)
+
+Raw logs are off by default; enable with `--raw`:
+
+```bash
+code-marshal -a GEMINI --raw "..."
+```
+
+---
+
+## Recommended OpenClaw Pattern: background + PTY
+
+Run in the background with PTY enabled to monitor the event stream.
+
+```bash
+# Start a coding task (agent auto-pick if --agent is omitted)
+bash pty:true workdir:~/my-project background:true command:"code-marshal 'Refactor auth to use JWT'"
+
+# Specify agent
+bash pty:true workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this function'"
+
+# Pretty output (human readable)
+bash pty:true workdir:~/my-project background:true command:"code-marshal --pretty --agent GEMINI 'write a simple html'"
+
+# Follow-up (multi-turn)
+bash pty:true workdir:~/my-project background:true command:"code-marshal --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
+
+# Monitor progress
 process action:log sessionId:XXX
 ```
 
-## Options
+---
 
-- `-a, --agent <AGENT>`: Manually specify an agent engine (e.g., `CLAUDE_CODE`, `CURSOR_AGENT`).
-- `-l, --list-agents`: List all supported agent engines.
-- `-c, --check-installed`: Check which engines are currently installed.
+## CLI Options
 
-## Discovery
+- `-h, --help`: show help.
+- `-a, --agent <AGENT>`: specify an agent engine (e.g. `CLAUDE_CODE`, `CURSOR_AGENT`, `CODEX`, `OPENCODE`, `GEMINI`, `QWEN_CODE`).
+- `-f, --follow-up <SESSION_ID>`: run a follow-up prompt in an existing session.
+- `--reset-to <MESSAGE_ID>`: optional reset point for follow-up (if supported by the executor).
+- `--pretty`: pretty-print normalized events.
+- `--raw`: also emit raw child stdout/stderr events.
+- `-l, --list-agents`: list supported agent engines.
+- `-c, --check-installed`: check which engines are installed.
 
-```bash
-# List all supported agent engines
-code-marshal --list-agents
-
-# Check which ones are currently installed and ready to use
-code-marshal --check-installed
-```
+---
 
 ## Best Practices
 
-1.  **Defaults**: I will automatically pick the first installed engine.
-2.  **Overrides**: If you want me to use a specific one, just mention it in your request, and I'll pass the `--agent` flag.
-3.  **Memory**: I can remember your preferred agent engine via my memory system.
-
-## Environment Variables
-
-Ensure your provider-specific API keys are set in the environment where `code-marshal` is executed (e.g., `ANTHROPIC_API_KEY`).
+1. **Always capture SessionId** from the first run; it is required for follow-ups.
+2. If output seems "stuck", try `--raw` to see whether the underlying agent is waiting for auth/IO.
+3. Provider API keys must be set in the shell environment (e.g., `ANTHROPIC_API_KEY`, etc.).
