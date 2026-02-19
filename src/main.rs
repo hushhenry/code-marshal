@@ -26,7 +26,6 @@ async fn main() -> Result<()> {
 
     let mut agent_type_str: Option<String> = None;
     let mut follow_up_session_id: Option<String> = None;
-    let mut reset_to_message_id: Option<String> = None;
     let mut include_raw_logs = false;
     let mut pretty = false;
     let mut prompt = String::new();
@@ -61,14 +60,6 @@ async fn main() -> Result<()> {
                     i += 2;
                 } else {
                     anyhow::bail!("Missing value for --follow-up <SESSION_ID>");
-                }
-            }
-            "--reset-to" => {
-                if i + 1 < args.len() {
-                    reset_to_message_id = Some(args[i + 1].clone());
-                    i += 2;
-                } else {
-                    anyhow::bail!("Missing value for --reset-to <MESSAGE_ID>");
                 }
             }
             "--raw" => {
@@ -142,15 +133,9 @@ async fn main() -> Result<()> {
 
     let mut spawned = if let Some(session_id) = follow_up_session_id.as_deref() {
         println!("[SYSTEM] Follow-up session: {}", session_id);
-        agent.spawn_follow_up(
-            &current_dir,
-            &prompt,
-            session_id,
-            reset_to_message_id.as_deref(),
-            &env,
-        )
-        .await
-        .context("Failed to spawn follow-up")?
+        agent.spawn_follow_up(&current_dir, &prompt, session_id, None, &env)
+            .await
+            .context("Failed to spawn follow-up")?
     } else {
         agent.spawn(&current_dir, &prompt, &env)
             .await
@@ -378,7 +363,6 @@ Options:
   -a, --agent <AGENT>         Specify the agent to use
                               (Defaults to the first installed agent found)
   -f, --follow-up <SESSION>   Run as follow-up using an existing session id
-      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)
       --pretty                Pretty-print normalized events (human readable)
       --raw                   Also emit raw child stdout/stderr events (default: normalized-only)
   -l, --list-agents           List all supported agent types
