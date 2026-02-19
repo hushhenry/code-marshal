@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Upload (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: ""
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN_NAME="code-marshal${{ matrix.ext }}"
+          BIN_PATH="target/${{ matrix.target }}/release/${BIN_NAME}"
+          test -f "${BIN_PATH}"
+
+          VERSION="${GITHUB_REF_NAME}"
+          PKG_DIR="dist"
+          mkdir -p "${PKG_DIR}"
+
+          ASSET_BASENAME="code-marshal-${VERSION}-${{ matrix.target }}"
+
+          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
+            tar -C "target/${{ matrix.target }}/release" -czf "${PKG_DIR}/${ASSET_BASENAME}.tar.gz" "${BIN_NAME}"
+          else
+            7z a "${PKG_DIR}/${ASSET_BASENAME}.zip" "${BIN_PATH}"
+          fi
+
+          echo "ASSET_BASENAME=${ASSET_BASENAME}" >> $GITHUB_ENV
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

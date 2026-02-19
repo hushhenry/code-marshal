@@ -10,10 +10,38 @@ A minimalist, CLI-first coding agent driver extracted from the Vibe Kanban core.
 - **Engine Support**: Powered by `Claude Code` (default) and extensible to other OCI-compatible executors.
 - **Non-Blocking**: Built on `tokio` for efficient background processing and log streaming.
 
+## Installation
+
+### Prebuilt binaries (recommended)
+
+Install the latest release into `~/.local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hushhenry/code-marshal/master/scripts/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hushhenry/code-marshal/master/scripts/install.sh | bash -s -- --version v0.1.4
+```
+
+### Build from source
+
+```bash
+cargo install --path .
+```
+
 ## Usage
 
 ```bash
-cargo run -- "Your coding task prompt here"
+code-marshal --help
+
+# oneshot
+code-marshal -a GEMINI "write a simple html"
+
+# follow-up
+code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
 ```
 
 ## How it works
