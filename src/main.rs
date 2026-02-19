@@ -269,7 +269,7 @@ async fn main() -> Result<()> {
                             break;
                         }
                     }
-                    Some(Err(_)) => {"}
+                    Some(Err(_)) => {
                         // keep going on stream errors
                     }
                     None => {
