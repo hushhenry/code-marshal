@@ -27,6 +27,7 @@ async fn main() -> Result<()> {
     let mut agent_type_str: Option<String> = None;
     let mut follow_up_session_id: Option<String> = None;
     let mut reset_to_message_id: Option<String> = None;
+    let mut include_raw_logs = false;
     let mut prompt = String::new();
 
     // Simple arg parsing (intentionally lightweight; clap can be added later)
@@ -68,6 +69,10 @@ async fn main() -> Result<()> {
                 } else {
                     anyhow::bail!("Missing value for --reset-to <MESSAGE_ID>");
                 }
+            }
+            "--raw" => {
+                include_raw_logs = true;
+                i += 1;
             }
             arg if arg.starts_with('-') => {
                 anyhow::bail!("Unknown argument: {}", arg);
@@ -235,10 +240,16 @@ async fn main() -> Result<()> {
             msg_res = stream.next() => {
                 match msg_res {
                     Some(Ok(msg)) => {
-                        // Output normalized log for OpenClaw / orchestrators to consume
-                        println!("[AGENT_EVENT] {:?}", msg);
+                        // By default, print *normalized* events only (JsonPatch/SessionId/etc).
+                        // Raw stdout/stderr can be enabled via --raw.
+                        let is_raw = matches!(msg, LogMsg::Stdout(_) | LogMsg::Stderr(_));
+                        if include_raw_logs || !is_raw {
+                            let json = serde_json::to_string(&msg)
+                                .unwrap_or_else(|_| format!("{msg:?}"));
+                            println!("[AGENT_EVENT] {json}");
+                        }
 
-                        // Nice-to-have: surface session id clearly for follow-ups
+                        // Surface session id clearly for follow-ups
                         if let LogMsg::SessionId(id) = &msg {
                             println!("[SYSTEM] SessionId: {}", id);
                             println!("[SYSTEM] Follow-up usage: code-marshal -a {} --follow-up {} \"your next prompt\"", agent_type, id);
@@ -249,7 +260,7 @@ async fn main() -> Result<()> {
                             break;
                         }
                     }
-                    Some(Err(_)) => {
+                    Some(Err(_)) => {"}
                         // keep going on stream errors
                     }
                     None => {
@@ -353,6 +364,7 @@ fn print_usage() {
     println!("                              (Defaults to the first installed agent found)");
     println!("  -f, --follow-up <SESSION>   Run as follow-up using an existing session id");
     println!("      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)");
+    println!("      --raw                   Also emit raw child stdout/stderr events (default: normalized-only)");
     println!("  -l, --list-agents           List all supported agent types");
     println!("  -c, --check-installed       Check which agents are installed on the system");
 }
