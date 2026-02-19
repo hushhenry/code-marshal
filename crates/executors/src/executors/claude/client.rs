@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use workspace_utils::approvals::ApprovalStatus;
 
@@ -34,6 +35,8 @@ pub struct ClaudeAgentClient {
     repo_context: RepoContext,
     commit_reminder_prompt: String,
     cancel: CancellationToken,
+    init_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    init_rx: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
 }
 
 impl ClaudeAgentClient {
@@ -46,6 +49,7 @@ impl ClaudeAgentClient {
         cancel: CancellationToken,
     ) -> Arc<Self> {
         let auto_approve = approvals.is_none();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         Arc::new(Self {
             log_writer,
             approvals,
@@ -53,7 +57,29 @@ impl ClaudeAgentClient {
             repo_context,
             commit_reminder_prompt,
             cancel,
+            init_tx: Mutex::new(Some(tx)),
+            init_rx: Mutex::new(Some(rx)),
         })
+    }
+
+    pub async fn wait_for_init(&self) -> Result<(), ExecutorError> {
+        let rx = self
+            .init_rx
+            .lock()
+            .await
+            .take()
+            .ok_or_else(|| ExecutorError::Io(std::io::Error::other("Init receiver already taken")))?;
+
+        // Wait with timeout to avoid hanging forever if Claude fails to start
+        tokio::select! {
+            res = rx => {
+                res.map_err(|_| ExecutorError::Io(std::io::Error::other("Claude init channel closed")))?;
+                Ok(())
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                Err(ExecutorError::Io(std::io::Error::other("Timed out waiting for Claude init")))
+            }
+        }
     }
 
     async fn handle_approval(
@@ -220,6 +246,11 @@ impl ClaudeAgentClient {
     }
 
     pub async fn log_message(&self, line: &str) -> Result<(), ExecutorError> {
+        if line.contains("\"type\":\"system\"") && line.contains("\"subtype\":\"init\"") {
+            if let Some(tx) = self.init_tx.lock().await.take() {
+                let _ = tx.send(());
+            }
+        }
         self.log_writer.log_raw(line).await
     }
 }
