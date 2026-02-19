@@ -245,8 +245,8 @@ impl StandardCodingAgentExecutor for ClaudeCode {
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {
+        // Auth file indicates an interactive login happened before.
         let auth_file_path = dirs::home_dir().map(|home| home.join(".claude.json"));
-
         if let Some(path) = auth_file_path
             && let Some(timestamp) = std::fs::metadata(&path)
                 .ok()
@@ -258,7 +258,14 @@ impl StandardCodingAgentExecutor for ClaudeCode {
                 last_auth_timestamp: timestamp,
             };
         }
-        AvailabilityInfo::NotFound
+
+        // Claude Code is invoked via `npx ...`, so binary availability mostly means Node tooling exists.
+        let npx_found = workspace_utils::shell::resolve_executable_path_blocking("npx").is_some();
+        if npx_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
+        }
     }
 
     async fn available_slash_commands(

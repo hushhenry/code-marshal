@@ -134,16 +134,9 @@ impl StandardCodingAgentExecutor for Gemini {
             };
         }
 
-        let mcp_config_found = self
-            .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
-
-        let installation_indicator_found = dirs::home_dir()
-            .map(|home| home.join(".gemini").join("installation_id").exists())
-            .unwrap_or(false);
-
-        if mcp_config_found || installation_indicator_found {
+        // Gemini CLI is invoked via `npx ...`. If Node tooling is present, consider it installed.
+        let npx_found = workspace_utils::shell::resolve_executable_path_blocking("npx").is_some();
+        if npx_found {
             AvailabilityInfo::InstallationFound
         } else {
             AvailabilityInfo::NotFound

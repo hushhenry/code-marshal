@@ -386,7 +386,8 @@ enum PatchValue {
     NormalizedEntry(executors::logs::NormalizedEntry),
     Stdout(String),
     Stderr(String),
-    Diff(serde_json::Value),
+    // We don't need diff payloads in the CLI pretty-printer; keep the variant for forward-compat.
+    Diff(()),
 }
 
 #[derive(serde::Deserialize)]
