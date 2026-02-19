@@ -21,6 +21,10 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+# Used by the CLI for streaming child stdout/stderr into MsgStore
+futures = { workspace = true }
+tokio-util = { version = "0.7", features = ["io"] }
+
 [workspace.dependencies]
 tokio = { version = "1.0", features = ["full"] }
 axum = { version = "0.8.4", features = ["macros", "multipart", "ws"] }

@@ -28,6 +28,7 @@ async fn main() -> Result<()> {
     let mut follow_up_session_id: Option<String> = None;
     let mut reset_to_message_id: Option<String> = None;
     let mut include_raw_logs = false;
+    let mut pretty = false;
     let mut prompt = String::new();
 
     // Simple arg parsing (intentionally lightweight; clap can be added later)
@@ -72,6 +73,10 @@ async fn main() -> Result<()> {
             }
             "--raw" => {
                 include_raw_logs = true;
+                i += 1;
+            }
+            "--pretty" => {
+                pretty = true;
                 i += 1;
             }
             arg if arg.starts_with('-') => {
@@ -244,9 +249,13 @@ async fn main() -> Result<()> {
                         // Raw stdout/stderr can be enabled via --raw.
                         let is_raw = matches!(msg, LogMsg::Stdout(_) | LogMsg::Stderr(_));
                         if include_raw_logs || !is_raw {
-                            let json = serde_json::to_string(&msg)
-                                .unwrap_or_else(|_| format!("{msg:?}"));
-                            println!("[AGENT_EVENT] {json}");
+                            if pretty {
+                                pretty_print_logmsg(&msg);
+                            } else {
+                                let json = serde_json::to_string(&msg)
+                                    .unwrap_or_else(|_| format!("{msg:?}"));
+                                println!("[AGENT_EVENT] {json}");
+                            }
                         }
 
                         // Surface session id clearly for follow-ups
@@ -360,11 +369,118 @@ fn print_usage() {
     println!("  follow-up        : resume/fork an existing session via --follow-up <SESSION_ID>");
     println!("");
     println!("Options:");
+    println!("  -h, --help                  Show this help");
     println!("  -a, --agent <AGENT>         Specify the agent to use");
     println!("                              (Defaults to the first installed agent found)");
     println!("  -f, --follow-up <SESSION>   Run as follow-up using an existing session id");
     println!("      --reset-to <MESSAGE_ID> Optional reset point for follow-up (if supported)");
+    println!("      --pretty                Pretty-print normalized events (human readable)");
     println!("      --raw                   Also emit raw child stdout/stderr events (default: normalized-only)");
     println!("  -l, --list-agents           List all supported agent types");
     println!("  -c, --check-installed       Check which agents are installed on the system");
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum PatchOp {
+    Add,
+    Replace,
+    Remove,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "type", content = "content", rename_all = "SCREAMING_SNAKE_CASE")]
+enum PatchValue {
+    NormalizedEntry(executors::logs::NormalizedEntry),
+    Stdout(String),
+    Stderr(String),
+    Diff(serde_json::Value),
+}
+
+#[derive(serde::Deserialize)]
+struct PatchEntry {
+    op: PatchOp,
+    path: String,
+    value: Option<PatchValue>,
+}
+
+fn pretty_print_logmsg(msg: &LogMsg) {
+    match msg {
+        LogMsg::SessionId(id) => {
+            println!("[EVENT][session] {id}");
+        }
+        LogMsg::MessageId(id) => {
+            println!("[EVENT][message_id] {id}");
+        }
+        LogMsg::Finished => {
+            println!("[EVENT][finished]");
+        }
+        LogMsg::Ready => {
+            println!("[EVENT][ready]");
+        }
+        LogMsg::JsonPatch(patch) => {
+            // json_patch::Patch is a Vec<PatchOperation> internally, but our patch entries
+            // are custom objects (see logs/utils/patch.rs). We parse via serde_json.
+            let Ok(v) = serde_json::to_value(patch) else {
+                println!("[EVENT][patch] <unserializable>");
+                return;
+            };
+            let Ok(entries) = serde_json::from_value::<Vec<PatchEntry>>(v) else {
+                println!("[EVENT][patch] <unparseable>");
+                return;
+            };
+
+            for e in entries {
+                let kind = match e.op {
+                    PatchOp::Add => "add",
+                    PatchOp::Replace => "replace",
+                    PatchOp::Remove => "remove",
+                };
+
+                match e.value {
+                    Some(PatchValue::NormalizedEntry(ne)) => {
+                        use executors::logs::NormalizedEntryType as T;
+                        match &ne.entry_type {
+                            T::AssistantMessage => {
+                                println!("[EVENT][assistant][{kind}] {}", ne.content.trim_end());
+                            }
+                            T::SystemMessage => {
+                                println!("[EVENT][system][{kind}] {}", ne.content.trim_end());
+                            }
+                            T::Thinking => {
+                                println!("[EVENT][thinking][{kind}] {}", ne.content.trim_end());
+                            }
+                            T::ErrorMessage { .. } => {
+                                println!("[EVENT][error][{kind}] {}", ne.content.trim_end());
+                            }
+                            T::ToolUse { tool_name, status, .. } => {
+                                println!("[EVENT][tool][{kind}] {tool_name} ({status:?}) :: {}", ne.content.trim_end());
+                            }
+                            other => {
+                                println!("[EVENT][entry:{other:?}][{kind}] {}", ne.content.trim_end());
+                            }
+                        }
+                    }
+                    Some(PatchValue::Stdout(s)) => {
+                        println!("[EVENT][stdout][{kind}] {}", s.trim_end());
+                    }
+                    Some(PatchValue::Stderr(s)) => {
+                        println!("[EVENT][stderr][{kind}] {}", s.trim_end());
+                    }
+                    Some(PatchValue::Diff(_)) => {
+                        println!("[EVENT][diff][{kind}] path={} ", e.path);
+                    }
+                    None => {
+                        println!("[EVENT][patch][{kind}] path={} (no value)", e.path);
+                    }
+                }
+            }
+        }
+        LogMsg::Stdout(s) => {
+            println!("[EVENT][stdout] {}", s.trim_end());
+        }
+        LogMsg::Stderr(s) => {
+            println!("[EVENT][stderr] {}", s.trim_end());
+        }
+    }
 }
