@@ -499,16 +499,9 @@ impl StandardCodingAgentExecutor for CursorAgent {
             return AvailabilityInfo::NotFound;
         }
 
-        let config_files_found = self
-            .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
-
-        if config_files_found {
-            AvailabilityInfo::InstallationFound
-        } else {
-            AvailabilityInfo::NotFound
-        }
+        // Cursor agent can be installed and usable without MCP config.
+        // MCP trust/config is only needed for MCP features.
+        AvailabilityInfo::InstallationFound
     }
 }
 /* ===========================
