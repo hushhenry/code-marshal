@@ -6,7 +6,7 @@ use executors::{
     env::{ExecutionEnv, RepoContext},
     executors::{BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor},
 };
-use tokio_stream::StreamExt;
+use futures::StreamExt;
 use workspace_utils::{log_msg::LogMsg, msg_store::MsgStore};
 
 #[tokio::main]
@@ -166,23 +166,24 @@ async fn main() -> Result<()> {
 
     // Wire child stdout/stderr -> MsgStore
     {
-        use futures::StreamExt as _;
         use tokio_util::io::ReaderStream;
 
         if let Some(stdout) = spawned.child.inner().stdout.take() {
             let msg_store_clone = msg_store.clone();
             tokio::spawn(async move {
                 let mut stream = ReaderStream::new(stdout);
-                while let Some(chunk) = stream.next().await {
+                while let Some(chunk) = futures::StreamExt::next(&mut stream).await {
                     match chunk {
                         Ok(bytes) => {
-                            let s = String::from_utf8_lossy(&bytes).into_owned();
+                            let s = String::from_utf8_lossy(bytes.as_ref()).into_owned();
                             if !s.is_empty() {
                                 msg_store_clone.push_stdout(s);
                             }
                         }
                         Err(e) => {
-                            msg_store_clone.push_stderr(format!("[code-marshal] stdout read error: {e}"));
+                            msg_store_clone.push_stderr(format!(
+                                "[code-marshal] stdout read error: {e}"
+                            ));
                             break;
                         }
                     }
@@ -194,16 +195,18 @@ async fn main() -> Result<()> {
             let msg_store_clone = msg_store.clone();
             tokio::spawn(async move {
                 let mut stream = ReaderStream::new(stderr);
-                while let Some(chunk) = stream.next().await {
+                while let Some(chunk) = futures::StreamExt::next(&mut stream).await {
                     match chunk {
                         Ok(bytes) => {
-                            let s = String::from_utf8_lossy(&bytes).into_owned();
+                            let s = String::from_utf8_lossy(bytes.as_ref()).into_owned();
                             if !s.is_empty() {
                                 msg_store_clone.push_stderr(s);
                             }
                         }
                         Err(e) => {
-                            msg_store_clone.push_stderr(format!("[code-marshal] stderr read error: {e}"));
+                            msg_store_clone.push_stderr(format!(
+                                "[code-marshal] stderr read error: {e}"
+                            ));
                             break;
                         }
                     }

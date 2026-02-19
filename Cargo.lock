@@ -809,10 +809,12 @@ version = "0.1.4"
 dependencies = [
  "anyhow",
  "executors",
+ "futures",
  "serde",
  "serde_json",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "utils",
 ]
 
