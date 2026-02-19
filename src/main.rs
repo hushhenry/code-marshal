@@ -18,6 +18,12 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Common UX: allow `code-marshal help` in addition to --help/-h
+    if args.len() == 2 && (args[1] == "help" || args[1] == "--help" || args[1] == "-h") {
+        print_usage();
+        return Ok(());
+    }
+
     let mut agent_type_str: Option<String> = None;
     let mut follow_up_session_id: Option<String> = None;
     let mut reset_to_message_id: Option<String> = None;
@@ -27,6 +33,10 @@ async fn main() -> Result<()> {
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
+            "--help" | "-h" => {
+                print_usage();
+                return Ok(());
+            }
             "--list-agents" | "-l" => {
                 list_agents();
                 return Ok(());
@@ -137,8 +147,60 @@ async fn main() -> Result<()> {
             .context("Failed to spawn agent")?
     };
 
-    // 5) Initialize message store for normalized logs
+    // 5) Initialize message store
+    //
+    // IMPORTANT: in vibe-kanban, the "container" layer streams child stdout/stderr into MsgStore.
+    // code-marshal is a CLI, so we must do that wiring here; otherwise normalize_logs has nothing
+    // to consume and you won't see SessionId / assistant messages / tool calls.
     let msg_store = Arc::new(MsgStore::new());
+
+    // Wire child stdout/stderr -> MsgStore
+    {
+        use futures::StreamExt as _;
+        use tokio_util::io::ReaderStream;
+
+        if let Some(stdout) = spawned.child.inner().stdout.take() {
+            let msg_store_clone = msg_store.clone();
+            tokio::spawn(async move {
+                let mut stream = ReaderStream::new(stdout);
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(bytes) => {
+                            let s = String::from_utf8_lossy(&bytes).into_owned();
+                            if !s.is_empty() {
+                                msg_store_clone.push_stdout(s);
+                            }
+                        }
+                        Err(e) => {
+                            msg_store_clone.push_stderr(format!("[code-marshal] stdout read error: {e}"));
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+
+        if let Some(stderr) = spawned.child.inner().stderr.take() {
+            let msg_store_clone = msg_store.clone();
+            tokio::spawn(async move {
+                let mut stream = ReaderStream::new(stderr);
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(bytes) => {
+                            let s = String::from_utf8_lossy(&bytes).into_owned();
+                            if !s.is_empty() {
+                                msg_store_clone.push_stderr(s);
+                            }
+                        }
+                        Err(e) => {
+                            msg_store_clone.push_stderr(format!("[code-marshal] stderr read error: {e}"));
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+    }
 
     // 6) Start log normalization (background)
     {
