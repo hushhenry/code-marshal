@@ -59,18 +59,16 @@ ARCH="$(uname -m)"
 case "$OS" in
   linux) TARGET_OS="unknown-linux-gnu" ;;
   darwin) TARGET_OS="apple-darwin" ;;
-  msys*|mingw*|cygwin*) TARGET_OS="pc-windows-msvc" ;;
+  msys*|mingw*|cygwin*)
+    echo "Windows is not supported by this installer yet." >&2
+    exit 1
+    ;;
   *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
 esac
 
 case "$ARCH" in
   x86_64|amd64) TARGET_ARCH="x86_64" ;;
-  arm64|aarch64)
-    # We don't publish arm artifacts yet; fail clearly.
-    echo "Unsupported arch for prebuilt releases: $ARCH" >&2
-    echo "Build from source instead: cargo install --path ." >&2
-    exit 1
-    ;;
+  arm64|aarch64) TARGET_ARCH="aarch64" ;;
   *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
 esac
 

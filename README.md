@@ -14,6 +14,10 @@ A minimalist, CLI-first coding agent driver extracted from the Vibe Kanban core.
 
 ### Prebuilt binaries (recommended)
 
+Supported platforms (prebuilt):
+- Linux: x86_64, aarch64 (ARM64)
+- macOS: x86_64, aarch64 (Apple Silicon)
+
 Install the latest release into `~/.local/bin`:
 
 ```bash

@@ -21,14 +21,18 @@ jobs:
             target: x86_64-unknown-linux-gnu
             ext: ""
             archive: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            ext: ""
+            archive: tar.gz
           - os: macos-latest
             target: x86_64-apple-darwin
             ext: ""
             archive: tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            ext: .exe
-            archive: zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ""
+            archive: tar.gz
 
     steps:
       - uses: actions/checkout@v4
@@ -58,11 +62,8 @@ jobs:
 
           ASSET_BASENAME="code-marshal-${VERSION}-${{ matrix.target }}"
 
-          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
-            tar -C "target/${{ matrix.target }}/release" -czf "${PKG_DIR}/${ASSET_BASENAME}.tar.gz" "${BIN_NAME}"
-          else
-            7z a "${PKG_DIR}/${ASSET_BASENAME}.zip" "${BIN_PATH}"
-          fi
+          # We currently publish tar.gz only (Linux/macOS). Windows is intentionally omitted.
+          tar -C "target/${{ matrix.target }}/release" -czf "${PKG_DIR}/${ASSET_BASENAME}.tar.gz" "${BIN_NAME}"
 
           echo "ASSET_BASENAME=${ASSET_BASENAME}" >> $GITHUB_ENV
 
