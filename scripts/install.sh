@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="hushhenry/code-marshal"
+REPO="WqyJh/code-marshal"
 BIN_NAME="code-marshal"
 
 usage() {
@@ -9,10 +9,10 @@ usage() {
 Install code-marshal from the latest GitHub Release.
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/hushhenry/code-marshal/master/scripts/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/WqyJh/code-marshal/master/scripts/install.sh | bash
 
 Options:
-  --repo <owner/name>     Override GitHub repo (default: hushhenry/code-marshal)
+  --repo <owner/name>     Override GitHub repo (default: WqyJh/code-marshal)
   --version <tag>         Install a specific version tag (default: latest)
   --prefix <dir>          Install prefix (default: ~/.local/bin)
   --force                 Overwrite existing binary

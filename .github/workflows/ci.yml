@@ -2,36 +2,36 @@ name: Rust CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-      continue-on-error: true
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
-      continue-on-error: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
-    - name: Build
-      run: cargo build --verbose
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-    - name: Run tests
-      run: cargo test --verbose
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Test
+        run: cargo test --all --verbose

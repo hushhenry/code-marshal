@@ -1,109 +1,60 @@
 ---
 name: code-marshal
-description: High-performance, minimalist coding agent driver based on the Vibe engine. Automatically selects the first available agent.
+description: High-performance, minimalist coding agent driver. Automatically selects the first available agent.
 metadata:
   {
-    "openclaw": { "emoji": "💂", "requires": { "anyBins": ["code-marshal"] } },
+    "openclaw": { "emoji": "💂", "requires": { "anyBins": ["code-marshal"] } }
   }
 ---
 
 # Code-Marshal Skill
 
-Use **code-marshal** to drive multiple coding agents (Claude Code / Cursor / Codex / OpenCode / Gemini / Qwen, etc.) through **one unified CLI**.
+Use `code-marshal` to drive multiple coding agents (Claude Code / Cursor / Codex / OpenCode / Gemini / Qwen, etc.) through one unified CLI.
 
 Key properties:
 
-- **Oneshot + Follow-up**: run a new task, then continue multi-turn work by resuming/forking a previous session.
-- **Normalized events**: emits a stream of normalized events (session id, assistant messages, tool calls/results) as machine-readable JSON.
-- **Automation-first**: can run with auto-approvals (no human gating).
+- Oneshot + follow-up: run a task, then continue multi-turn work via `--follow-up <SESSION_ID>`
+- Normalized events: emits a compact event stream (pretty by default; `--json` for machine-readable)
+- Automation-first: can be used in non-interactive orchestration flows
 
----
-
-## Quick Start
-
-### Oneshot (default)
+## Quick start
 
 ```bash
+# oneshot
 code-marshal -a GEMINI "write a simple html"
-```
 
-The output includes a `SessionId` event. Save it for follow-ups.
-
-### Follow-up (multi-turn)
-
-```bash
+# follow-up (multi-turn)
 code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
 ```
 
----
+## Output (important)
 
-## Output Format (important)
+- Default output is pretty (human-readable) to reduce token volume.
+- Use `--json` to emit machine-readable JSON events.
+- Use `--raw` to also include raw child stdout/stderr events.
 
-Default output is **pretty** (human-readable) to reduce token volume.
-
-By default, code-marshal prints **normalized events only**.
-
-- Each event is printed as a single line prefixed with:
-  - `[AGENT_EVENT] <json>`
-- Event JSON is `LogMsg` serialized (examples):
-  - `{ "SessionId": "..." }`
-  - `{ "JsonPatch": [...] }` (normalized assistant/tool entries)
-  - `{ "Finished": ... }`
-
-### Pretty printing (human readable)
-
-If you want a more readable stream, add `--pretty`:
+## Recommended OpenClaw pattern: background
 
 ```bash
-code-marshal -a GEMINI "write a simple html"
-```
-
-### Include raw child stdout/stderr (debugging)
-
-Raw logs are off by default; enable with `--raw`:
-
-```bash
-code-marshal -a GEMINI --raw "..."
-```
-
----
-
-## Recommended OpenClaw Pattern: background
-
-Run in the background to monitor the event stream. PTY is usually unnecessary because code-marshal does not require stdin.
-
-```bash
-# Start a coding task (agent auto-pick if --agent is omitted)
+# Start a coding task
 bash workdir:~/my-project background:true command:"code-marshal 'Refactor auth to use JWT'"
 
 # Specify agent
 bash workdir:~/my-project background:true command:"code-marshal --agent CURSOR_AGENT 'Explain this function'"
 
-# Pretty output (human readable)
-bash workdir:~/my-project background:true command:"code-marshal --agent GEMINI 'write a simple html'"
-
-# Follow-up (multi-turn)
+# Follow-up
 bash workdir:~/my-project background:true command:"code-marshal --agent GEMINI --follow-up <SESSION_ID> 'add a button'"
 
 # Monitor progress
 process action:log sessionId:XXX
 ```
 
----
+## CLI options
 
-## CLI Options
-
-- `-h, --help`: show help.
-- `-a, --agent <AGENT>`: specify an agent engine (e.g. `CLAUDE_CODE`, `CURSOR_AGENT`, `CODEX`, `OPENCODE`, `GEMINI`, `QWEN_CODE`).
-- `-f, --follow-up <SESSION_ID>`: run a follow-up prompt in an existing session.
-- `--raw`: also emit raw child stdout/stderr events.
-- `-l, --list-agents`: list supported agent engines.
-- `-c, --check-installed`: check which engines are installed.
-
----
-
-## Best Practices
-
-1. **Always capture SessionId** from the first run; it is required for follow-ups.
-2. If output seems "stuck", try `--raw` to see whether the underlying agent is waiting for auth/IO.
-3. Provider API keys must be set in the shell environment (e.g., `ANTHROPIC_API_KEY`, etc.).
+- `-h, --help`: show help
+- `-a, --agent <AGENT>`: specify an agent engine
+- `-f, --follow-up <SESSION_ID>`: follow-up prompt in an existing session
+- `--json`: emit JSON events instead of pretty output
+- `--raw`: also emit raw child stdout/stderr
+- `-l, --list-agents`: list supported agent engines
+- `-c, --check-installed`: check which engines are installed

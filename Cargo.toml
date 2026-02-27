@@ -11,6 +11,10 @@ members = [
 name = "code-marshal"
 version = "0.1.4"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A minimalist CLI-first coding agent driver with normalized event output."
+repository = "https://github.com/WqyJh/code-marshal"
+readme = "README.md"
 
 [dependencies]
 tokio = { workspace = true }

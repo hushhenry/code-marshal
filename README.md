@@ -1,33 +1,35 @@
-# Code-Marshal 🦞
+# Code-Marshal
 
-A minimalist, CLI-first coding agent driver extracted from the Vibe Kanban core. Designed for programmatic control and seamless integration with AI automation systems like OpenClaw.
+A minimalist, CLI-first coding agent driver extracted from the Vibe Kanban core.
+
+Code-Marshal is designed for programmatic control and seamless integration with AI automation/orchestration systems (e.g. OpenClaw).
 
 ## Features
 
-- **Minimalist Core**: Stripped-down version of Vibe's execution engine.
-- **Auto-Approval**: Injects a `NoopExecutorApprovalService` to run tasks without human intervention.
-- **Normalized Logs**: Streams structured agent events to `stdout` with `[AGENT_EVENT]` prefixes.
-- **Engine Support**: Powered by `Claude Code` (default) and extensible to other OCI-compatible executors.
-- **Non-Blocking**: Built on `tokio` for efficient background processing and log streaming.
+- Minimal core: a stripped-down execution engine focused on running coding agents
+- Auto-approval: can run tasks without human gating (optional)
+- Normalized logs: streams structured events to stdout (pretty or JSON)
+- Multi-engine support: Claude Code / Cursor / Codex / OpenCode / Gemini / Qwen (depending on what’s installed)
+- Non-blocking: built on Tokio for efficient background processing
 
 ## Installation
 
 ### Prebuilt binaries (recommended)
 
-Supported platforms (prebuilt):
+Supported platforms:
 - Linux: x86_64, aarch64 (ARM64)
 - macOS: x86_64, aarch64 (Apple Silicon)
 
 Install the latest release into `~/.local/bin`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hushhenry/code-marshal/master/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WqyJh/code-marshal/master/scripts/install.sh | bash
 ```
 
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hushhenry/code-marshal/master/scripts/install.sh | bash -s -- --version v0.1.4
+curl -fsSL https://raw.githubusercontent.com/WqyJh/code-marshal/master/scripts/install.sh | bash -s -- --version v0.1.4
 ```
 
 ### Build from source
@@ -48,30 +50,33 @@ code-marshal -a GEMINI "write a simple html"
 code-marshal -a GEMINI --follow-up <SESSION_ID> "add a button"
 ```
 
+### Output modes
+
+- Default: human-friendly pretty output
+- `--json`: machine-readable JSON event stream
+- `--raw`: also include raw child stdout/stderr
+
 ## How it works
 
-Code-Marshal acts as a bridge between high-level AI orchestrators and low-level interactive coding agents. It handles the PTY allocation, protocol parsing, and log normalization, providing a clean stream of events for the orchestrator to monitor.
-
-```text
-[SYSTEM] Initializing Code-Marshal...
-[SYSTEM] Spawning agent in /path/to/project
-[SYSTEM] Task started. Streaming normalized events...
-[AGENT_EVENT] ToolUse { tool: "ls", ... }
-[AGENT_EVENT] ToolResult { output: "src/ lib.rs ...", ... }
-[AGENT_EVENT] AssistantMessage { content: "I've analyzed the files..." }
-[SYSTEM] Code-Marshal session concluded.
-```
+Code-Marshal acts as a bridge between high-level orchestrators and low-level interactive coding agents. It handles PTY allocation, protocol parsing, and log normalization, producing a clean event stream that an orchestrator can monitor.
 
 ## Development
 
-This project is a fork of [Vibe Kanban](https://github.com/hushhenry/vibe-kanban), specifically focusing on the `executors` and `utils` crates.
+This project is derived from the Vibe Kanban codebase and focuses on the `executors` and `utils` crates.
 
-### Structure
+Repo structure:
+- `crates/executors`: manages agent lifecycles
+- `crates/utils`: shared utilities (logging, process management, etc.)
+- `src/main.rs`: CLI entry point
 
-- `crates/executors`: The heart of the system, managing agent lifecycles.
-- `crates/utils`: Shared utilities for logging, process management, and more.
-- `src/main.rs`: The minimalist CLI entry point.
+### Common commands
+
+```bash
+cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all
+```
 
 ## License
 
-MIT / Apache-2.0
+Dual-licensed under MIT OR Apache-2.0.

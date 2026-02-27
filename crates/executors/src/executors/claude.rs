@@ -365,7 +365,9 @@ impl ClaudeCode {
             // Wait for Claude's init message before proceeding
             // Using a shorter 5s timeout and logging instead of failing to avoid blocking
             if let Err(e) = client.wait_for_init().await {
-                tracing::warn!("Did not receive init from Claude within timeout: {e}. Proceeding anyway...");
+                tracing::warn!(
+                    "Did not receive init from Claude within timeout: {e}. Proceeding anyway..."
+                );
             }
 
             // Initialize control protocol

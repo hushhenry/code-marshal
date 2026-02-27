@@ -63,12 +63,9 @@ impl ClaudeAgentClient {
     }
 
     pub async fn wait_for_init(&self) -> Result<(), ExecutorError> {
-        let rx = self
-            .init_rx
-            .lock()
-            .await
-            .take()
-            .ok_or_else(|| ExecutorError::Io(std::io::Error::other("Init receiver already taken")))?;
+        let rx = self.init_rx.lock().await.take().ok_or_else(|| {
+            ExecutorError::Io(std::io::Error::other("Init receiver already taken"))
+        })?;
 
         // Wait with timeout to avoid hanging forever if Claude fails to start
         tokio::select! {

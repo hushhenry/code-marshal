@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
         let available = get_installed_agent_types()?;
         if let Some(first) = available.first() {
             println!("[SYSTEM] Using first available agent: {}", first);
-            first.clone()
+            *first
         } else {
             anyhow::bail!(
                 "No coding agents found on system. Please install one (e.g., claude-code, cursor, etc.)"
@@ -117,13 +117,16 @@ async fn main() -> Result<()> {
         }
     };
 
-    println!("[SYSTEM] Initializing Code-Marshal with Agent: {}...", agent_type);
+    println!(
+        "[SYSTEM] Initializing Code-Marshal with Agent: {}...",
+        agent_type
+    );
 
     // 1) Setup executor
     let mut agent = create_agent(agent_type)?;
 
     // 2) Auto-approval (fully automated)
-    let approval_service = Arc::new(NoopExecutorApprovalService::default());
+    let approval_service = Arc::new(NoopExecutorApprovalService);
     agent.use_approvals(approval_service);
 
     // 3) Environment setup
@@ -143,11 +146,13 @@ async fn main() -> Result<()> {
 
     let mut spawned = if let Some(session_id) = follow_up_session_id.as_deref() {
         println!("[SYSTEM] Follow-up session: {}", session_id);
-        agent.spawn_follow_up(&current_dir, &prompt, session_id, None, &env)
+        agent
+            .spawn_follow_up(&current_dir, &prompt, session_id, None, &env)
             .await
             .context("Failed to spawn follow-up")?
     } else {
-        agent.spawn(&current_dir, &prompt, &env)
+        agent
+            .spawn(&current_dir, &prompt, &env)
             .await
             .context("Failed to spawn agent")?
     };
@@ -176,9 +181,8 @@ async fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            msg_store_clone.push_stderr(format!(
-                                "[code-marshal] stdout read error: {e}"
-                            ));
+                            msg_store_clone
+                                .push_stderr(format!("[code-marshal] stdout read error: {e}"));
                             break;
                         }
                     }
@@ -199,9 +203,8 @@ async fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            msg_store_clone.push_stderr(format!(
-                                "[code-marshal] stderr read error: {e}"
-                            ));
+                            msg_store_clone
+                                .push_stderr(format!("[code-marshal] stderr read error: {e}"));
                             break;
                         }
                     }
@@ -306,15 +309,36 @@ async fn main() -> Result<()> {
 fn create_agent(agent_type: BaseCodingAgent) -> Result<CodingAgent> {
     let agent_json = "{}";
     match agent_type {
-        BaseCodingAgent::ClaudeCode => Ok(serde_json::from_str::<executors::executors::claude::ClaudeCode>(agent_json)?.into()),
-        BaseCodingAgent::CursorAgent => Ok(serde_json::from_str::<executors::executors::cursor::CursorAgent>(agent_json)?.into()),
-        BaseCodingAgent::Codex => Ok(serde_json::from_str::<executors::executors::codex::Codex>(agent_json)?.into()),
-        BaseCodingAgent::Opencode => Ok(serde_json::from_str::<executors::executors::opencode::Opencode>(agent_json)?.into()),
-        BaseCodingAgent::Gemini => Ok(serde_json::from_str::<executors::executors::gemini::Gemini>(agent_json)?.into()),
-        BaseCodingAgent::QwenCode => Ok(serde_json::from_str::<executors::executors::qwen::QwenCode>(agent_json)?.into()),
-        BaseCodingAgent::Amp => Ok(serde_json::from_str::<executors::executors::amp::Amp>(agent_json)?.into()),
-        BaseCodingAgent::Copilot => Ok(serde_json::from_str::<executors::executors::copilot::Copilot>(agent_json)?.into()),
-        BaseCodingAgent::Droid => Ok(serde_json::from_str::<executors::executors::droid::Droid>(agent_json)?.into()),
+        BaseCodingAgent::ClaudeCode => Ok(serde_json::from_str::<
+            executors::executors::claude::ClaudeCode,
+        >(agent_json)?
+        .into()),
+        BaseCodingAgent::CursorAgent => Ok(serde_json::from_str::<
+            executors::executors::cursor::CursorAgent,
+        >(agent_json)?
+        .into()),
+        BaseCodingAgent::Codex => {
+            Ok(serde_json::from_str::<executors::executors::codex::Codex>(agent_json)?.into())
+        }
+        BaseCodingAgent::Opencode => Ok(serde_json::from_str::<
+            executors::executors::opencode::Opencode,
+        >(agent_json)?
+        .into()),
+        BaseCodingAgent::Gemini => {
+            Ok(serde_json::from_str::<executors::executors::gemini::Gemini>(agent_json)?.into())
+        }
+        BaseCodingAgent::QwenCode => {
+            Ok(serde_json::from_str::<executors::executors::qwen::QwenCode>(agent_json)?.into())
+        }
+        BaseCodingAgent::Amp => {
+            Ok(serde_json::from_str::<executors::executors::amp::Amp>(agent_json)?.into())
+        }
+        BaseCodingAgent::Copilot => {
+            Ok(serde_json::from_str::<executors::executors::copilot::Copilot>(agent_json)?.into())
+        }
+        BaseCodingAgent::Droid => {
+            Ok(serde_json::from_str::<executors::executors::droid::Droid>(agent_json)?.into())
+        }
     }
 }
 
@@ -330,10 +354,10 @@ fn get_installed_agent_types() -> Result<Vec<BaseCodingAgent>> {
         BaseCodingAgent::Copilot,
         BaseCodingAgent::Droid,
     ];
-    
+
     let mut installed = Vec::new();
     for at in all_types {
-        if let Ok(agent) = create_agent(at.clone()) {
+        if let Ok(agent) = create_agent(at) {
             if agent.get_availability_info().is_available() {
                 installed.push(at);
             }
@@ -345,7 +369,7 @@ fn get_installed_agent_types() -> Result<Vec<BaseCodingAgent>> {
 async fn check_installed_agents() -> Result<()> {
     println!("[SYSTEM] Checking for installed agent binaries...");
     let installed = get_installed_agent_types()?;
-    
+
     let all_types = vec![
         BaseCodingAgent::ClaudeCode,
         BaseCodingAgent::CursorAgent,
@@ -359,7 +383,11 @@ async fn check_installed_agents() -> Result<()> {
     ];
 
     for at in all_types {
-        let status = if installed.contains(&at) { "INSTALLED" } else { "NOT_FOUND" };
+        let status = if installed.contains(&at) {
+            "INSTALLED"
+        } else {
+            "NOT_FOUND"
+        };
         println!("  - {:<15}: {}", at, status);
     }
     Ok(())
@@ -411,7 +439,7 @@ enum PatchOp {
 #[derive(serde::Deserialize)]
 #[serde(tag = "type", content = "content", rename_all = "SCREAMING_SNAKE_CASE")]
 enum PatchValue {
-    NormalizedEntry(executors::logs::NormalizedEntry),
+    NormalizedEntry(Box<executors::logs::NormalizedEntry>),
     Stdout(String),
     Stderr(String),
     // We don't need diff payloads in the CLI pretty-printer; keep the variant for forward-compat.
@@ -474,11 +502,19 @@ fn pretty_print_logmsg(msg: &LogMsg) {
                             T::ErrorMessage { .. } => {
                                 println!("[EVENT][error][{kind}] {}", ne.content.trim_end());
                             }
-                            T::ToolUse { tool_name, status, .. } => {
-                                println!("[EVENT][tool][{kind}] {tool_name} ({status:?}) :: {}", ne.content.trim_end());
+                            T::ToolUse {
+                                tool_name, status, ..
+                            } => {
+                                println!(
+                                    "[EVENT][tool][{kind}] {tool_name} ({status:?}) :: {}",
+                                    ne.content.trim_end()
+                                );
                             }
                             other => {
-                                println!("[EVENT][entry:{other:?}][{kind}] {}", ne.content.trim_end());
+                                println!(
+                                    "[EVENT][entry:{other:?}][{kind}] {}",
+                                    ne.content.trim_end()
+                                );
                             }
                         }
                     }

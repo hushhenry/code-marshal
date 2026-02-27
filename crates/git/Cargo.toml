@@ -2,6 +2,8 @@
 name = "git"
 version = "0.1.12"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/WqyJh/code-marshal"
 
 [features]
 default = []
